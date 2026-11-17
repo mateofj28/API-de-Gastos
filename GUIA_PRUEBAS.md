@@ -84,6 +84,16 @@ Api GET  /expenses/summary -Token $token
 | Contraseña incorrecta | `401` `invalid_credentials` |
 | Correo que no existe | `401` `invalid_credentials`, **idéntico** al caso anterior |
 | Enviar JSON en vez de formulario | `422` |
+| 5 contraseñas incorrectas seguidas en la misma cuenta | El 6.º intento da `429` `rate_limited`, **incluso con la contraseña correcta** |
+| Más de 10 logins en un minuto desde tu equipo | `429` `rate_limited` con la cabecera `Retry-After` |
+| Más de 10 registros en una hora desde tu equipo | `429` `rate_limited` |
+
+Para ver el bloqueo por cuenta:
+```powershell
+1..6 | ForEach-Object { Api POST /auth/login @{ username = "ana@example.com"; password = "incorrecta-123" } -Form }
+Api POST /auth/login @{ username = "ana@example.com"; password = $pw } -Form     # 429 aunque sea la correcta
+```
+El bloqueo dura como máximo 15 minutos. Para saltarlo mientras pruebas: detén el servidor y arráncalo de nuevo (los contadores viven en memoria) o ponle `RATE_LIMIT_ENABLED=false` al `.env` y reinicia. Vuelve a poner `true` después.
 
 ### Acceso con token
 | Qué haces | Esperado |
@@ -121,7 +131,7 @@ Si cambias `ACCESS_TOKEN_EXPIRE_MINUTES` en el `.env`, vuelve a ponerlo en `30` 
 ## 5. Pruebas automáticas
 
 ```powershell
-pytest                              # todas (63)
+pytest                              # todas (80)
 pytest tests/test_auth.py           # un archivo
 pytest -k expired                   # solo las pruebas cuyo nombre contenga "expired"
 pytest -x                           # se detiene en la primera que falle
@@ -149,6 +159,7 @@ Todas las respuestas de error tienen la misma forma:
 | `token_expired` | Pasaron los minutos de vida | Inicia sesión de nuevo |
 | `invalid_credentials` | Correo o contraseña mal | Recuerda que `username` es el correo |
 | `account_disabled` (403) | `is_active = 0` en la base | Ver la sección siguiente |
+| `rate_limited` (429) | Demasiados intentos de login o registro | Espera los segundos de `Retry-After`, o reinicia el servidor mientras pruebas |
 
 **Si tras reiniciar el servidor todos los tokens dan `invalid_token`:** probablemente cambió la `SECRET_KEY`. Es lo esperado: las sesiones anteriores dejan de valer.
 

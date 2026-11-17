@@ -6,7 +6,7 @@ from fastapi import FastAPI, Query, Request, Response  # Núcleo de FastAPI
 from fastapi.exceptions import RequestValidationError  # Error de datos inválidos
 from starlette.exceptions import HTTPException as StarletteHTTPException  # Errores HTTP
 
-from . import auth, config, repository  # Rutas de login, configuración y acceso a datos
+from . import auth, config, rate_limit, repository  # Rutas de login, configuración, límites y datos
 from .database import init_db  # Crea las tablas al iniciar
 from .dependencies import CurrentUser  # Usuario autenticado
 from .errors import AppError, error_response  # Errores con formato uniforme
@@ -17,6 +17,7 @@ from .schemas import Expense, ExpenseBase, Summary  # Modelos de entrada y salid
 async def lifespan(_: FastAPI):
     """Se ejecuta al arrancar la app: valida la configuración y prepara la base de datos."""
     config.validate_settings()  # Si falta SECRET_KEY, la app no arranca (mejor que fallar en producción)
+    rate_limit.setup()  # Crea los contadores de límites, en cero
     init_db()  # Crea las tablas e índices si no existen
     yield  # La app queda funcionando; aquí iría el código de cierre
 

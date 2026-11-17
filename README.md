@@ -32,6 +32,11 @@ python -c "import secrets; print(secrets.token_hex(32))"   # genera una clave
 | `SECRET_KEY` | Sí | Clave para firmar los tokens (mínimo 32 caracteres) |
 | `DATABASE_PATH` | No | Archivo SQLite. Por defecto `expenses.db` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Vida del token, entre 1 y 1440. Por defecto 30 |
+| `RATE_LIMIT_LOGIN_IP` | No | Intentos de login por IP. Por defecto `10/minute` |
+| `RATE_LIMIT_LOGIN_ACCOUNT` | No | Fallos de login por cuenta antes de bloquearla. Por defecto `5 per 15 minute` |
+| `RATE_LIMIT_REGISTER` | No | Registros por IP. Por defecto `10/hour` |
+| `RATE_LIMIT_ENABLED` | No | `false` apaga todos los límites. Por defecto `true` |
+| `RATE_LIMIT_STORAGE_URI` | No | Dónde se guardan los contadores. Por defecto `memory://` |
 
 ## Ejecutar
 ```bash
@@ -86,6 +91,7 @@ Formato de errores (el código va en inglés y el mensaje en español):
 | 401 | `invalid_credentials` | Correo o contraseña incorrectos (mismo error en ambos casos) |
 | 403 | `account_disabled` | La cuenta está desactivada |
 | 409 | `email_taken` | Ya existe una cuenta con ese correo |
+| 429 | `rate_limited` | Demasiados intentos. La cabecera `Retry-After` indica cuántos segundos esperar |
 | 422 | `validation` | Datos inválidos |
 | 404 | `not_found` | El gasto no existe **o pertenece a otro usuario** |
 
@@ -97,6 +103,7 @@ app/
   dependencies.py     obtiene y valida al usuario de cada petición
   security.py         hash de contraseñas (Argon2) y tokens JWT
   config.py           variables de entorno y su validación
+  rate_limit.py       límites de peticiones (login y registro)
   errors.py           error controlado y formato de errores
   schemas.py          validación de datos
   repository.py       SQL de gastos
@@ -121,8 +128,22 @@ UPDATE expenses SET user_id = 1 WHERE user_id IS NULL;   -- 1 = id del usuario
 - Correo inexistente y contraseña incorrecta dan el mismo error y tardan lo mismo, para no revelar qué cuentas existen.
 - El dueño de un gasto sale siempre del token, nunca de lo que envía el cliente. Un gasto ajeno responde 404.
 - El límite de 128 caracteres en la contraseña evita que textos enormes agoten la CPU.
+- Límite de peticiones contra fuerza bruta: por IP en login y registro, y por cuenta en los fallos de login.
+  Funciona igual con correos que no existen, así que tampoco revela qué cuentas hay.
+
+### Límites de peticiones: lo que debes saber al desplegar
+- **Detrás de un proxy (Nginx, un balanceador, la mayoría de plataformas):** la API ve la IP del proxy y todos
+  los usuarios compartirían el mismo límite. Arranca uvicorn con
+  `--proxy-headers --forwarded-allow-ips=<IP del proxy>`. No uses `*` salvo que el servidor solo sea
+  accesible a través del proxy: si no, cualquiera podría falsificar su IP.
+- **Varios procesos o servidores:** con `memory://` cada proceso cuenta por separado, y el límite real
+  se multiplica por el número de procesos. Para que sea compartido usa Redis en `RATE_LIMIT_STORAGE_URI`
+  (requiere `pip install redis`).
+- Los contadores en memoria se reinician al reiniciar la app.
+- **Bloqueo por cuenta:** alguien puede bloquear temporalmente la cuenta de otra persona fallando a propósito
+  su contraseña. Es el costo de frenar los ataques repartidos entre muchas IP. El bloqueo dura como máximo 15 minutos
+  y no revela datos.
 
 ## Pendiente
-- Limitar intentos de login (rate limiting) contra fuerza bruta
 - Refresh tokens y cierre de sesión que invalide el token (hoy el token sirve hasta que vence)
 - Etapa 6: Dockerfile y despliegue en internet (con HTTPS)

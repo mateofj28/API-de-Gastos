@@ -88,6 +88,7 @@ Sigue la guía oficial de FastAPI para OAuth2 con JWT, usando PyJWT y pwdlib con
 |---|---|
 | `config.py` | Lee `SECRET_KEY` y `ACCESS_TOKEN_EXPIRE_MINUTES`. Al arrancar comprueba que sean válidas; si no, la app no inicia |
 | `security.py` | Calcula y verifica hashes Argon2. Crea y verifica tokens JWT |
+| `rate_limit.py` | Limita los intentos de login y los registros (ver la sección siguiente) |
 | `dependencies.py` | `get_current_user`: lee el token, lo verifica, busca al usuario y distingue cada fallo |
 | `auth.py` | Rutas `/auth/register`, `/auth/login` y `/auth/me` |
 | `user_repository.py` | SQL de la tabla `users` |
@@ -102,6 +103,22 @@ Sigue la guía oficial de FastAPI para OAuth2 con JWT, usando PyJWT y pwdlib con
 - **El dueño sale del token.** `repository.py` recibe `user_id` en cada función y lo pone en el `WHERE`. Un gasto de otra persona se ve igual que uno inexistente (404), para no revelar que existe.
 - **Las rutas de login son `def`, no `async def`.** Argon2 usa CPU. FastAPI ejecuta las funciones `def` en un hilo aparte y así no bloquea las demás peticiones.
 - **El correo único lo garantiza la base de datos.** Si dos registros llegan a la vez, la restricción `UNIQUE` hace fallar a uno. Consultar antes de insertar dejaría pasar a ambos.
+
+## Límite de peticiones
+
+`rate_limit.py` usa la librería `limits` con **ventana móvil**: cuenta las peticiones de los últimos N minutos, sin un reinicio brusco en cada cambio de minuto que permitiría ráfagas el doble de grandes.
+
+Hay dos límites distintos en el login:
+- **Por IP** (`10/minute`): cuenta todos los intentos. Frena a una sola máquina que prueba muchas contraseñas. Se aplica como dependencia de la ruta, antes de ejecutar nada, así que un intento rechazado ni siquiera calcula el hash Argon2, que es lo caro.
+- **Por cuenta** (`5 per 15 minute`): cuenta solo los fallos de un correo, venga de la IP que venga. Frena a un atacante que reparte los intentos entre muchas IP, algo que el límite por IP no ve.
+
+**Por qué así:**
+- **Se comprueba antes de buscar al usuario, y también cuenta los correos inexistentes.** Si solo se limitaran las cuentas reales, la respuesta 429 delataría cuáles existen.
+- **Un login correcto borra los fallos.** Equivocarse al escribir una vez no debe acercar a nadie al bloqueo.
+- **Los intentos rechazados no suman fallos.** Si sumaran, el bloqueo se alargaría solo mientras alguien insiste.
+- **`Retry-After` y mensaje en español.** El cliente sabe cuándo reintentar.
+- **Se configura por variables de entorno y se valida al arrancar.** Un límite mal escrito impide iniciar, como una clave débil.
+- **El almacén se puede cambiar a Redis** sin tocar el código, para compartir contadores entre servidores.
 
 ## Cómo viaja una petición
 

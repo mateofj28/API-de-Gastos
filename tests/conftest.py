@@ -15,6 +15,14 @@ def _environment(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "test.db"))  # Base de datos temporal
     monkeypatch.setenv("SECRET_KEY", TEST_SECRET)  # Clave válida
     monkeypatch.delenv("ACCESS_TOKEN_EXPIRE_MINUTES", raising=False)  # Duración por defecto
+    for name in (  # Límites por defecto, sin importar lo que haya en el entorno de quien corre las pruebas
+        "RATE_LIMIT_ENABLED",
+        "RATE_LIMIT_LOGIN_IP",
+        "RATE_LIMIT_LOGIN_ACCOUNT",
+        "RATE_LIMIT_REGISTER",
+        "RATE_LIMIT_STORAGE_URI",
+    ):
+        monkeypatch.delenv(name, raising=False)
 
 
 @pytest.fixture()
