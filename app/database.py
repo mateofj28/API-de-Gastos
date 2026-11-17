@@ -1,4 +1,5 @@
 """Conexión a SQLite. La ruta viene de una variable de entorno, no del código."""
+
 import os  # Para leer variables de entorno
 import sqlite3  # Cliente de SQLite incluido en Python
 from contextlib import contextmanager  # Permite crear un "with" propio
@@ -33,7 +34,7 @@ def init_db() -> None:
             """
             CREATE TABLE IF NOT EXISTS expenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,  -- identificador único autoincremental
-                amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),  -- monto en centavos, debe ser positivo
+                amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),  -- monto en centavos, mayor que 0
                 category TEXT NOT NULL,  -- categoría del gasto
                 description TEXT NOT NULL DEFAULT '',  -- descripción opcional
                 date TEXT NOT NULL  -- fecha en formato AAAA-MM-DD

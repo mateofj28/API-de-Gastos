@@ -1,6 +1,6 @@
 """API de gastos personales. Ejecutar con:  uvicorn app.main:app --reload"""
+
 from contextlib import asynccontextmanager  # Para definir tareas de inicio/cierre
-from typing import Optional  # Para parámetros opcionales
 
 from fastapi import FastAPI, Query, Request, Response  # Núcleo de FastAPI
 from fastapi.exceptions import RequestValidationError  # Error de datos inválidos
@@ -77,9 +77,9 @@ def create_expense(expense: ExpenseBase):
 @app.get("/expenses", response_model=list[Expense])
 def list_expenses(
     # Filtro opcional por categoría, máximo 50 caracteres
-    category: Optional[str] = Query(None, max_length=50),
+    category: str | None = Query(None, max_length=50),
     # Filtro opcional por mes: la expresión regular exige el formato AAAA-MM con mes 01-12
-    month: Optional[str] = Query(None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$", description="Formato AAAA-MM"),
+    month: str | None = Query(None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$", description="Formato AAAA-MM"),
     # Cantidad máxima de resultados: entre 1 y 100, 20 por defecto
     limit: int = Query(20, ge=1, le=100),
     # Cuántos resultados saltar (para pasar de página); no puede ser negativo

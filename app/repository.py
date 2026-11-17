@@ -1,6 +1,5 @@
 """Acceso a datos: aquí vive todo el SQL. Siempre con parámetros (?), nunca
 concatenando texto del usuario, para evitar inyección SQL."""
-from typing import Optional  # Para indicar valores que pueden ser None
 
 from .database import connection  # Conexión con commit/rollback automático
 from .schemas import ExpenseBase  # Datos validados de un gasto
@@ -22,7 +21,7 @@ def create(expense: ExpenseBase) -> dict:
         return {"id": cur.lastrowid, **expense.model_dump()}
 
 
-def get(expense_id: int) -> Optional[dict]:
+def get(expense_id: int) -> dict | None:
     """Busca un gasto por id; devuelve None si no existe."""
     with connection() as con:  # Abre la conexión
         # Busca la fila con ese id (consulta parametrizada)
@@ -30,9 +29,7 @@ def get(expense_id: int) -> Optional[dict]:
         return dict(row) if row else None  # Convierte la fila a diccionario, o None
 
 
-def list_all(
-    category: Optional[str], month: Optional[str], limit: int, offset: int
-) -> list[dict]:
+def list_all(category: str | None, month: str | None, limit: int, offset: int) -> list[dict]:
     """Lista gastos con filtros opcionales y paginación."""
     conditions: list[str] = []  # Fragmentos de SQL fijos, escritos por nosotros
     params: list = []  # Valores del usuario, enviados aparte del SQL
@@ -55,7 +52,7 @@ def list_all(
         return [dict(r) for r in con.execute(sql, params).fetchall()]
 
 
-def update(expense_id: int, expense: ExpenseBase) -> Optional[dict]:
+def update(expense_id: int, expense: ExpenseBase) -> dict | None:
     """Reemplaza un gasto; devuelve None si el id no existe."""
     with connection() as con:  # Abre la conexión
         cur = con.execute(  # Ejecuta el UPDATE con parámetros

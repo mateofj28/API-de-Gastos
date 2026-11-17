@@ -1,4 +1,5 @@
 """Esquemas: definen y validan los datos que entran y salen de la API."""
+
 from datetime import date  # Tipo fecha; Pydantic valida el formato AAAA-MM-DD
 
 from pydantic import BaseModel, Field, field_validator  # Herramientas de validación
@@ -8,9 +9,7 @@ class ExpenseBase(BaseModel):
     """Campos que el cliente envía al crear o reemplazar un gasto."""
 
     # Monto en centavos como entero (ej. 2500000 = 25.000,00); debe ser mayor que 0
-    amount_cents: int = Field(
-        gt=0, le=100_000_000_000, description="Monto en centavos (entero mayor que 0)"
-    )
+    amount_cents: int = Field(gt=0, le=100_000_000_000, description="Monto en centavos (entero mayor que 0)")
     # Categoría: entre 1 y 50 caracteres
     category: str = Field(min_length=1, max_length=50)
     # Descripción opcional: vacía por defecto, máximo 200 caracteres

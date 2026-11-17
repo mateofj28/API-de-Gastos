@@ -32,10 +32,16 @@ def test_create_and_get(client):
     assert r.json()["amount_cents"] == 2_500_000  # El monto se conserva exacto
 
 
-@pytest.mark.parametrize("field,value", [  # Se ejecuta una vez por cada par
-    ("amount_cents", -5), ("amount_cents", 0), ("amount_cents", 10.5),
-    ("category", "   "), ("date", "not-a-date"),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [  # Se ejecuta una vez por cada par
+        ("amount_cents", -5),
+        ("amount_cents", 0),
+        ("amount_cents", 10.5),
+        ("category", "   "),
+        ("date", "not-a-date"),
+    ],
+)
 def test_rejects_invalid_data(client, field, value):
     """Los datos inválidos se rechazan con 422 y formato uniforme."""
     r = client.post("/expenses", json={**EXPENSE, field: value})  # Sustituye un campo por uno inválido

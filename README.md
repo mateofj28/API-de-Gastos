@@ -25,10 +25,14 @@ uvicorn app.main:app --reload
 ```
 Abre http://127.0.0.1:8000/docs para probar los endpoints desde el navegador.
 
-## Tests
+## Tests y calidad de código
 ```bash
-pytest
+pytest                  # pruebas
+ruff check .            # revisión de estilo y errores comunes
+ruff format .           # formateo automático
 ```
+La configuración está en `pyproject.toml`. En cada push y pull request, GitHub Actions
+(`.github/workflows/ci.yml`) ejecuta `ruff check`, `ruff format --check` y `pytest`.
 
 ## Endpoints
 | Método | Ruta | Descripción |

@@ -1,0 +1,42 @@
+# Integración continua: se ejecuta en cada push y en cada pull request hacia main.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Permisos mínimos: el flujo solo necesita leer el código
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # Descarga el código del repositorio
+      - uses: actions/checkout@v4
+
+      # Instala Python y guarda en caché las dependencias de pip
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      # Instala las dependencias de desarrollo
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      # Revisa estilo y errores comunes
+      - name: Lint
+        run: ruff check .
+
+      # Revisa que el formato sea consistente
+      - name: Format check
+        run: ruff format --check .
+
+      # Ejecuta las pruebas
+      - name: Tests
+        run: pytest

@@ -1,0 +1,23 @@
+# Configuración central de las herramientas del proyecto.
+# Las dependencias siguen en requirements*.txt.
+
+[tool.ruff]
+# Versión mínima de Python que soporta el proyecto
+target-version = "py312"
+# Largo máximo de línea
+line-length = 110
+
+[tool.ruff.lint]
+# E/W: estilo (pycodestyle), F: errores (pyflakes), I: orden de imports,
+# B: errores comunes (bugbear), UP: sintaxis moderna de Python, S: seguridad (bandit)
+select = ["E", "W", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# En las pruebas es normal usar "assert"
+"tests/*" = ["S101"]
+
+[tool.pytest.ini_options]
+# Carpeta donde están las pruebas
+testpaths = ["tests"]
+# Salida resumida y avisos visibles
+addopts = "-q"
