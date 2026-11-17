@@ -10,16 +10,20 @@ El proyecto se divide en capas. Cada capa tiene una sola responsabilidad y solo 
 Cliente (navegador, app, curl)
         │  petición HTTP (JSON)
         ▼
-   main.py          ← capa web: recibe peticiones y arma respuestas
+   main.py / auth.py  ← capa web: recibe peticiones y arma respuestas
         │  usa
         ▼
-   schemas.py       ← valida los datos que entran y salen
+   dependencies.py    ← identifica al usuario de cada petición (token)
+        │  usa
+        ▼
+   security.py        ← hash de contraseñas y tokens JWT
+   schemas.py         ← valida los datos que entran y salen
         │
         ▼
-   repository.py    ← capa de datos: todo el SQL
+   repository.py / user_repository.py  ← capa de datos: todo el SQL
         │  usa
         ▼
-   database.py      ← conexión a SQLite y creación de tablas
+   database.py        ← conexión a SQLite, tablas y migración
         │
         ▼
    expenses.db      ← archivo de la base de datos
@@ -32,7 +36,8 @@ Regla de dependencias: cada archivo importa solo los de abajo en el diagrama. `d
 ### `database.py`: conexión a la base de datos
 - `db_path()` lee la variable de entorno `DATABASE_PATH`. Si no existe, usa `expenses.db`.
 - `connection()` es un context manager. Abre la conexión, guarda los cambios (`commit`) si todo salió bien, los deshace (`rollback`) si hubo un error, y siempre cierra la conexión.
-- `init_db()` crea la tabla `expenses` y sus índices si todavía no existen.
+- `init_db()` crea las tablas `users` y `expenses` y sus índices si todavía no existen. Si encuentra una tabla `expenses` antigua sin `user_id`, agrega la columna sin borrar datos.
+- Activa `PRAGMA foreign_keys` en cada conexión: SQLite no hace cumplir las claves foráneas si no se le pide, y sin eso `ON DELETE CASCADE` no funcionaría.
 
 **Por qué así:**
 - La ruta sale de una variable de entorno para que cambie entre desarrollo, pruebas y producción sin tocar el código. Las pruebas la usan para trabajar con una base temporal.
@@ -75,9 +80,32 @@ Contiene una función por operación: `create`, `get`, `list_all`, `update`, `de
 - El error 500 devuelve un mensaje genérico. Los detalles internos (rutas, SQL) no deben llegar al cliente.
 - `/expenses/summary` se declara antes de `/expenses/{expense_id}`. FastAPI evalúa las rutas en orden, y si fuera al revés trataría "summary" como un id.
 
+## Autenticación
+
+Sigue la guía oficial de FastAPI para OAuth2 con JWT, usando PyJWT y pwdlib con Argon2.
+
+| Archivo | Qué hace |
+|---|---|
+| `config.py` | Lee `SECRET_KEY` y `ACCESS_TOKEN_EXPIRE_MINUTES`. Al arrancar comprueba que sean válidas; si no, la app no inicia |
+| `security.py` | Calcula y verifica hashes Argon2. Crea y verifica tokens JWT |
+| `dependencies.py` | `get_current_user`: lee el token, lo verifica, busca al usuario y distingue cada fallo |
+| `auth.py` | Rutas `/auth/register`, `/auth/login` y `/auth/me` |
+| `user_repository.py` | SQL de la tabla `users` |
+| `errors.py` | `AppError` y el formato de respuesta de errores |
+
+**Por qué así:**
+- **Falla al arrancar, no en producción.** Sin una clave secreta fuerte los tokens se podrían falsificar. Una app que arranca sin ella parece sana, pero es insegura.
+- **Argon2.** Es lento a propósito, lo que hace costoso probar millones de contraseñas si se filtra la base. Cada hash lleva su propia sal.
+- **El mismo error para correo inexistente y contraseña incorrecta.** Si fueran distintos, cualquiera podría averiguar qué correos tienen cuenta. Cuando el correo no existe, `burn_time` hace igualmente un cálculo de hash para que la demora tampoco delate la diferencia.
+- **`algorithms=[...]` fijo y `require: exp, iat, sub`.** Impide los ataques que cambian el algoritmo del token (incluido `none`, sin firma) y los tokens que nunca vencen.
+- **Distintos códigos de error de token.** `token_expired` le dice al cliente que debe pedir un login nuevo. `invalid_token` indica algo mal o falsificado.
+- **El dueño sale del token.** `repository.py` recibe `user_id` en cada función y lo pone en el `WHERE`. Un gasto de otra persona se ve igual que uno inexistente (404), para no revelar que existe.
+- **Las rutas de login son `def`, no `async def`.** Argon2 usa CPU. FastAPI ejecuta las funciones `def` en un hilo aparte y así no bloquea las demás peticiones.
+- **El correo único lo garantiza la base de datos.** Si dos registros llegan a la vez, la restricción `UNIQUE` hace fallar a uno. Consultar antes de insertar dejaría pasar a ambos.
+
 ## Cómo viaja una petición
 
-Ejemplo: `POST /expenses` con `{"amount_cents": 2500000, "category": "Comida", "description": "Almuerzo", "date": "2026-11-16"}`.
+Ejemplo: `POST /expenses` con la cabecera `Authorization: Bearer <token>` y `{"amount_cents": 2500000, "category": "Comida", "description": "Almuerzo", "date": "2026-11-16"}`.
 
 1. **`main.py`** recibe la petición y FastAPI intenta convertir el JSON en un `ExpenseBase`.
 2. **`schemas.py`** valida los datos: el monto es un entero mayor que 0, la fecha es válida, la categoría no está vacía. Convierte `"Comida"` en `"comida"`.

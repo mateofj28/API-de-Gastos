@@ -2,7 +2,39 @@
 
 from datetime import date  # Tipo fecha; Pydantic valida el formato AAAA-MM-DD
 
-from pydantic import BaseModel, Field, field_validator  # Herramientas de validación
+from pydantic import BaseModel, EmailStr, Field, field_validator  # Herramientas de validación
+
+# Largo de contraseña: mínimo 8 para que no sea trivial; máximo 128 para que nadie envíe textos
+# enormes y obligue al servidor a gastar CPU calculando el hash (ataque de denegación de servicio)
+PASSWORD_MIN_LENGTH = 8
+PASSWORD_MAX_LENGTH = 128
+
+
+class UserCreate(BaseModel):
+    """Datos que se envían para registrarse."""
+
+    email: EmailStr  # Correo con formato válido
+    password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        """Pasa el correo a minúsculas para que "A@x.com" y "a@x.com" sean la misma cuenta."""
+        return value.strip().lower()
+
+
+class UserPublic(BaseModel):
+    """Datos del usuario que se pueden mostrar. Nunca incluye la contraseña ni su hash."""
+
+    id: int  # Identificador del usuario
+    email: str  # Correo del usuario
+
+
+class Token(BaseModel):
+    """Respuesta del login."""
+
+    access_token: str  # El JWT que el cliente enviará en cada petición
+    token_type: str  # Siempre "bearer"
 
 
 class ExpenseBase(BaseModel):
