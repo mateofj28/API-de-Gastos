@@ -106,6 +106,7 @@ tests/                pruebas automáticas
 ```
 
 Para entender cómo se comunican las partes y por qué se diseñó así, lee [ARQUITECTURA.md](ARQUITECTURA.md).
+Para probar la API paso a paso y resolver problemas, lee [GUIA_PRUEBAS.md](GUIA_PRUEBAS.md).
 
 ## Actualizar una base de datos anterior a la etapa 5
 Al arrancar, la app agrega la columna `user_id` a `expenses` sin borrar nada. Los gastos antiguos
